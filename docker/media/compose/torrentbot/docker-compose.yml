@@ -1,0 +1,10 @@
+services:
+  torrentbot:
+    build: .
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - username=${QBITTORRENT_USERNAME}
+      - password=${QBITTORENT_PASSWORD}
+      - host=${HOST}
+      - port=8090
+    restart: unless-stopped

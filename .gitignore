@@ -1,0 +1,39 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/README.md
+*.pem
+*.key
+*.crt
+*.p12
+
+# Databases and runtime state
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.bak
+*.backup
+*.dump
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Ansible
+*.retry
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets directories anywhere
+**/secrets/

@@ -1,0 +1,33 @@
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.containers.targets
+  forward_to = [loki.write.default.receiver]
+
+  labels = {
+    job   = "docker",
+    node  = "monitor-lxc",
+    group = "monitor",
+  }
+}
+
+loki.source.journal "system" {
+  path       = "/var/log/journal"
+  max_age    = "12h"
+  forward_to = [loki.write.default.receiver]
+
+  labels = {
+    job   = "systemd-journal",
+    node  = "monitor-lxc",
+    group = "monitor",
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://192.168.0.140:3100/loki/api/v1/push"
+  }
+}

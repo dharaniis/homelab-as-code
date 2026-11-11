@@ -1,0 +1,316 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+          - '192.168.0.140:9100'
+        labels:
+          node: 'monitor-lxc'
+
+      - targets:
+          - '192.168.0.151:9100'
+        labels:
+          node: 'media-lxc'
+
+      - targets:
+          - '192.168.0.160:9100'
+        labels:
+          node: 'proxy-lxc'
+
+      - targets:
+          - '192.168.0.170:9100'
+        labels:
+          node: 'cloud-lxc'
+
+      - targets:
+          - '192.168.0.150:9100'
+        labels:
+          node: 'ha-vm'
+
+      - targets:
+          - '192.168.0.100:9100'
+        labels:
+          node: 'proxmox'
+
+  - job_name: 'pve'
+    static_configs:
+      - targets:
+        - 192.168.0.100  # Proxmox VE node.
+    metrics_path: /pve
+    params:
+      module: [default]
+      cluster: ['1']
+      node: ['1']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 192.168.0.140:9221  # PVE exporter.
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets:
+          - '192.168.0.151:8080'
+        labels:
+          node: 'media-lxc'
+
+      - targets:
+          - '192.168.0.140:8080'
+        labels:
+          node: 'monitor-lxc'
+
+      - targets:
+          - '192.168.0.170:8080'
+        labels:
+          node: 'cloud-lxc'
+
+    metric_relabel_configs:
+      - regex: 'container_label_.*'
+        action: labeldrop
+
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+
+    static_configs:
+
+      # media-lxc
+
+      - targets:
+          - http://192.168.0.151:8096
+        labels:
+          service: 'jellyfin'
+          node: 'media-lxc'
+          group: 'media'
+
+      - targets:
+          - http://192.168.0.151:4533
+        labels:
+          service: 'navidrome'
+          node: 'media-lxc'
+          group: 'media'
+
+      - targets:
+          - http://192.168.0.151:7878
+        labels:
+          service: 'radarr'
+          node: 'media-lxc'
+          group: 'media'
+
+      - targets:
+          - http://192.168.0.151:8989
+        labels:
+          service: 'sonarr'
+          node: 'media-lxc'
+          group: 'media'
+
+      - targets:
+          - http://192.168.0.151:9696
+        labels:
+          service: 'prowlarr'
+          node: 'media-lxc'
+          group: 'media'
+
+      - targets:
+          - http://192.168.0.151:6767
+        labels:
+          service: 'bazarr'
+          node: 'media-lxc'
+          group: 'media'
+
+      - targets:
+          - http://192.168.0.151:8090
+        labels:
+          service: 'qbittorrent'
+          node: 'media-lxc'
+          group: 'media'
+
+
+      # cloud-lxc
+
+      - targets:
+          - http://192.168.0.170:2283
+        labels:
+          service: 'immich'
+          node: 'cloud-lxc'
+          group: 'cloud'
+
+
+      # monitor-lxc
+
+      - targets:
+          - http://192.168.0.140:3000
+        labels:
+          service: 'grafana'
+          node: 'monitor-lxc'
+          group: 'monitor'
+
+      - targets:
+          - http://192.168.0.140:9090
+        labels:
+          service: 'prometheus'
+          node: 'monitor-lxc'
+          group: 'monitor'
+
+      - targets:
+          - https://192.168.0.140:9443
+        labels:
+          service: 'portainer'
+          node: 'monitor-lxc'
+          group: 'monitor'
+
+
+      # ha-vm
+
+      - targets:
+          - http://192.168.0.150:8123
+        labels:
+          service: 'home-assistant'
+          node: 'ha-vm'
+          group: 'ha'
+
+
+    # BLACKBOX RELABELING
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: 192.168.0.140:9115
+
+  - job_name: 'blackbox-https'
+    metrics_path: /probe
+    params:
+      module: [https_no_verify]
+
+    static_configs:
+
+      - targets:
+          - https://192.168.0.160
+        labels:
+          service: 'caddy'
+          node: 'proxy-lxc'
+          group: 'proxy'
+
+      - targets:
+          - https://192.168.0.100:8006
+        labels:
+          service: 'proxmox'
+          node: 'proxmox'
+          group: 'proxmox'
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: 192.168.0.140:9115
+
+          #  - job_name: 'blackbox-tcp'
+          #metrics_path: /probe
+          #params:
+          #module: [tcp_connect]
+
+          #static_configs:
+          #- targets:
+          #- 192.168.0.160:443
+          #labels:
+          #service: 'caddy'
+          #node: 'proxy-lxc'
+          #group: 'proxy'
+
+          #relabel_configs:
+          #- source_labels: [__address__]
+          #target_label: __param_target
+
+          #- source_labels: [__param_target]
+          #target_label: instance
+
+          #- target_label: __address__
+          #replacement: 192.168.0.140:9115
+
+
+  - job_name: 'blackbox-caddy-https'
+    metrics_path: /probe
+    params:
+      module: [https_caddy]
+
+    static_configs:
+      - targets:
+          - https://192.168.0.160
+        labels:
+          service: 'caddy-https'
+          node: 'proxy-lxc'
+          group: 'proxy'
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: 192.168.0.140:9115
+
+  - job_name: 'snmp-openwrt'
+    metrics_path: /snmp
+    params:
+      auth: [openwrt]
+      module: [if_mib]
+    static_configs:
+      - targets:
+          - 192.168.0.1
+        labels:
+          node: 'openwrt'
+          group: 'network'
+          service: 'router'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 192.168.0.140:9116
+
+  - job_name: 'openwrt-nlbwmon'
+    metrics_path: /metrics
+    params:
+      collect[]: [nlbwmon]
+    static_configs:
+      - targets: ['192.168.0.1:9100']
+        labels:
+          node: 'openwrt'
+          group: 'network'
+          service: 'nlbwmon'
+
+  - job_name: 'isp-speedtest'
+    static_configs:
+      - targets: ['192.168.0.140:9516']
+        labels:
+          node: 'monitor-lxc'
+          group: 'network'
+          service: 'isp-speedtest'

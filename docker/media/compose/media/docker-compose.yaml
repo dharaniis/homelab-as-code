@@ -1,0 +1,121 @@
+services:
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Kolkata
+      - JELLYFIN_PublishedServerUrl=http://10.0.0.101
+    volumes:
+      - ./jellyfin/config:/config
+      - /home/dharaniis/media:/data
+    ports:
+      - 8096:8096
+      - 7359:7359/udp
+      - 1900:1900/udp
+    restart: unless-stopped
+    networks:
+      - localnet
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Kolkata
+    volumes:
+      - ./prowlarr:/config
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+    networks:
+      - localnet
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Kolkata
+    volumes:
+      - ./radarr:/config
+      - /home/dharaniis/media:/data
+    ports:
+      - 7878:7878
+    restart: unless-stopped
+    networks:
+      - localnet
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Kolkata
+    volumes:
+      - ./sonarr:/config
+      - /home/dharaniis/media:/data
+    ports:
+      - 8989:8989
+    restart: unless-stopped
+    networks:
+      - localnet
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Kolkata
+      - WEBUI_PORT=8090
+    volumes:
+      - ./qbittorrent:/config
+      - /home/dharaniis/media:/data
+    ports:
+      - 6881:6881
+      - 6881:6881/udp
+      - 8090:8090
+    restart: unless-stopped
+    networks:
+      - localnet
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Kolkata
+    volumes:
+      - ./bazarr:/config
+      - /home/dharaniis/media:/data
+    ports:
+      - 6767:6767
+    restart: unless-stopped
+    networks:
+      - localnet
+
+  navidrome:
+    image: deluan/navidrome:latest
+    user: 1000:1000 # must own the data folder and be able to read music folder(s). See Permissions below
+    ports:
+      - "4533:4533"
+    restart: unless-stopped
+#    environment:
+      # Optional: put your config options customization here. Examples:
+      # ND_LOGLEVEL: debug
+    volumes:
+      - "./navidrome/data:/data"
+      - "/home/dharaniis/media/music/tamil:/tamil:ro"
+      - "/home/dharaniis/media/music/english:/english:ro"
+    networks:
+      - localnet
+
+networks:
+  localnet:
+    name: localnet

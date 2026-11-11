@@ -1,0 +1,86 @@
+services:
+  wrapper:
+    build:
+      context: ./wrapper
+      dockerfile: Dockerfile
+    image: alacarte-wrapper:local
+    # Built from source, never on a registry: skip pulls (Portainer's re-pull
+    # option) and rebuild on every deploy so updates are picked up.
+    pull_policy: build
+    container_name: alacarte-wrapper
+    # Wrapper binary + upstream rootfs are amd64-only. Pinning the platform makes
+    # the build/run path explicit on arm64 hosts (Apple Silicon emulates via Rosetta).
+    platform: linux/amd64
+    volumes:
+      # ALACARTE_DATA_PATH lets hosts like Portainer (which resolve ./ per stack)
+      # keep settings and the Apple session at a fixed absolute path.
+      - ${ALACARTE_DATA_PATH:-./data}/wrapper:/app/rootfs/data
+      # Token the web container must send to the supervisor's control API,
+      # created on first start. Keeps other containers on the network from
+      # driving the Apple sign-in.
+      - ${ALACARTE_DATA_PATH:-./data}/supervisor:/app/supervisor-secret
+      # The chroot dev/ ships empty (.gitkeep only); the Android runtime needs
+      # working device nodes.  Explicit bind-mounts work on both Docker and Podman.
+      - /dev/null:/app/rootfs/dev/null
+      - /dev/urandom:/app/rootfs/dev/urandom
+      - /dev/random:/app/rootfs/dev/random
+      - /dev/zero:/app/rootfs/dev/zero
+    # Copy the container runtime's DNS config into the Android chroot, then run
+    # the supervisor, which passes argv to the wrapper and serves the sign-in
+    # control API on 40020 (internal network only).
+    entrypoint: ["/app/wrapper-entrypoint.sh"]
+    command: ["-H", "0.0.0.0"]
+    environment:
+      - LD_PRELOAD=/app/libwrapper_login_fix.so
+      - SUPERVISOR_TOKEN_FILE=/app/supervisor-secret/token
+    expose:
+      - "10020"
+      - "20020"
+      - "30020"
+      - "40020"
+    networks:
+      - alacarte-net
+    # The supervisor restarts the wrapper itself; this only covers the
+    # supervisor crashing.
+    restart: on-failure
+
+  web:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    pull_policy: build
+    container_name: alacarte-web
+    # Upstream apple-music-downloader image is published amd64-only.
+    platform: linux/amd64
+    depends_on:
+      - wrapper
+    environment:
+      - PORT=7373
+      - AMDL_WRAPPER_HOST=alacarte-wrapper
+      - AMDL_WRAPPER_DECRYPT_PORT=10020
+      - AMDL_WRAPPER_M3U8_PORT=20020
+      - AMDL_WRAPPER_ACCOUNT_PORT=30020
+      - AMDL_WRAPPER_SUPERVISOR_PORT=40020
+      - AMDL_SUPERVISOR_TOKEN_FILE=/supervisor-secret/token
+      - AMDL_MUSIC_PATH=/music
+      - AMDL_CONFIG_DIR=/config
+      - AMDL_SECRET_KEY=${AMDL_SECRET_KEY:-}
+      - AUTH_DISABLED=${AUTH_DISABLED:-false}
+      - TRUST_PROXY=${TRUST_PROXY:-loopback}
+    volumes:
+      - ${ALACARTE_DATA_PATH:-./data}/web:/config
+      - ${ALACARTE_DATA_PATH:-./data}/supervisor:/supervisor-secret:ro
+      - ${MUSIC_PATH:?Set MUSIC_PATH in .env}:/music
+    # Default (WEB_BIND unset/empty) publishes on all interfaces — same as
+    # docker's default. Set WEB_BIND=127.0.0.1 in .env to restrict the UI to
+    # the host machine only when fronting with a reverse proxy.
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-7373}:7373"
+    networks:
+      - alacarte-net
+    restart: unless-stopped
+
+networks:
+  alacarte-net:
+    name: ${DOCKER_NETWORK:-alacarte-net}
+    external: ${DOCKER_NETWORK_EXTERNAL:-false}

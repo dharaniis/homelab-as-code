@@ -1,0 +1,197 @@
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=90d'
+        #- '--storage.tsdb.retention.size=15GB'
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/:/etc/prometheus    # your yml configs
+      - /home/dharaniis/metrics-logs/prometheus/data:/prometheus          # TSDB data
+    user: "65534:65534"   # run as nobody to avoid permission issues
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/data:/var/lib/grafana
+    networks:
+      - monitoring
+
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    command:
+      - '--path.rootfs=/host'
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - '/:/host:ro,rslave'
+
+  pve-exporter:
+    image: prompve/prometheus-pve-exporter:latest
+    container_name: pve-exporter
+    restart: unless-stopped
+    volumes:
+      - ./secrets/pve.yml:/etc/prometheus/pve.yml
+    ports:
+      - "9221:9221"
+    networks:
+      - monitoring
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks:
+      - monitoring
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox_exporter
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./blackbox.yml:/config/blackbox.yml
+    command:
+      - '--config.file=/config/blackbox.yml'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - /home/dharaniis/metrics-logs/loki/data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monitoring
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    restart: unless-stopped
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /run/log/journal:/run/log/journal:ro
+    command:
+      - run
+      - /etc/alloy/config.alloy
+    networks:
+      - monitoring
+
+  snmp-exporter:
+    image: prom/snmp-exporter:latest
+    container_name: snmp-exporter
+    restart: unless-stopped
+    ports:
+      - "9116:9116"
+    volumes:
+      - ./snmp-exporter/snmp.yml:/etc/snmp_exporter/snmp.yml:ro
+    command:
+      - --config.file=/etc/snmp_exporter/snmp.yml
+    networks:
+      - monitoring
+
+
+  speedtest-exporter:
+    image: ghcr.io/lpicanco/prometheus-speedtest-exporter:latest
+    container_name: speedtest-exporter
+    restart: unless-stopped
+    ports:
+      - "9516:9516"
+    networks:
+      - monitoring
+
+  whatsupdocker:
+    image: getwud/wud:latest
+    container_name: wud
+    ports:
+      - "4000:3000"
+    environment:
+      - WUD_AUTH_ADMIN_USER=${WUD_AUTH_ADMIN_USER}
+      - WUD_AUTH_ADMIN_PASSWORD=${WUD_AUTH_ADMIN_PASSWORD}
+
+      - WUD_WATCHER_LOCAL_SOCKET=/var/run/docker.sock
+      - WUD_WATCHER_LOCAL_WATCHBYDEFAULT=true
+      - WUD_WATCHER_LOCAL_WATCHALL=true
+      - WUD_WATCHER_LOCAL_CRON=0 0 4 * * *
+      - WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_BACKUP=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_ROLLBACK=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_AUTO=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_LOCAL_PRUNE=true
+      - WUD_TRIGGER_DISCORD_LOCAL_URL=${WUD_DISCORD_WEBHOOK_URL}
+      - WUD_TRIGGER_DISCORD_LOCAL_BOTUSERNAME=WUD
+      
+      - WUD_WATCHER_MEDIA_WATCHBYDEFAULT=true
+      - WUD_WATCHER_MEDIA_WATCHALL=true
+      - WUD_WATCHER_MEDIA_HOST=${WUD_WATCHER_MEDIA_HOST} 
+      - WUD_WATCHER_MEDIA_PORT=2376
+      - WUD_WATCHER_MEDIA_CAFILE=/certs/ca.pem
+      - WUD_WATCHER_MEDIA_CERTFILE=/certs/cert.pem
+      - WUD_WATCHER_MEDIA_KEYFILE=/certs/key.pem
+      - WUD_WATCHER_MEDIA_CRON=0 0 4 * * *
+      - WUD_TRIGGER_DOCKERCOMPOSE_MEDIA_BACKUP=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_MEDIA_ROLLBACK=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_MEDIA_AUTO=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_MEDIA_PRUNE=true
+      - WUD_TRIGGER_DISCORD_MEDIA_URL=${WUD_DISCORD_WEBHOOK_URL}
+      - WUD_TRIGGER_DISCORD_MEDIA_BOTUSERNAME=WUD
+      
+      - WUD_WATCHER_CLOUD_HOST=${WUD_WATCHER_CLOUD_HOST}
+      - WUD_WATCHER_CLOUD_PORT=2376
+      - WUD_WATCHER_CLOUD_CAFILE=/certs/ca.pem
+      - WUD_WATCHER_CLOUD_CERTFILE=/certs/cert.pem
+      - WUD_WATCHER_CLOUD_KEYFILE=/certs/key.pem
+      - WUD_WATCHER_CLOUD_CRON=0 0 4 * * *
+      - WUD_TRIGGER_DOCKERCOMPOSE_CLOUD_BACKUP=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_CLOUD_ROLLBACK=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_CLOUD_AUTO=true
+      - WUD_TRIGGER_DOCKERCOMPOSE_CLOUD_PRUNE=true
+      - WUD_TRIGGER_DISCORD_CLOUD_URL=${WUD_DISCORD_WEBHOOK_URL}
+      - WUD_TRIGGER_DISCORD_CLOUD_BOTUSERNAME=WUD
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/docker/certs:/certs:ro
+      - wud-data:/var/lib/wud
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  wud-data:

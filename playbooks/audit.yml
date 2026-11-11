@@ -1,0 +1,48 @@
+---
+- name: Audit Docker infrastructure
+  hosts: docker_hosts
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Get Compose projects
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - ls
+          - --all
+      register: compose_projects
+      changed_when: false
+
+    - name: Find Compose files
+      ansible.builtin.find:
+        paths:
+          - /opt
+          - /srv
+          - /home/dharaniis/docker
+        patterns:
+          - compose.yaml
+          - compose.yml
+          - docker-compose.yaml
+          - docker-compose.yml
+        recurse: true
+        file_type: file
+      register: compose_files
+
+    - name: Inspect container metadata
+      ansible.builtin.shell: |
+        for id in $(docker ps -aq); do
+          docker inspect "$id" --format \
+          '{{ "{{" }}.Name{{ "}}" }} | {{ "{{" }}index .Config.Labels "com.docker.compose.project"{{ "}}" }} | {{ "{{" }}index .Config.Labels "com.docker.compose.project.working_dir"{{ "}}" }} | {{ "{{" }}index .Config.Labels "com.docker.compose.project.config_files"{{ "}}" }}'
+        done
+      register: containers
+      changed_when: false
+
+    - name: Display audit results
+      ansible.builtin.debug:
+        msg:
+          - "HOST: {{ inventory_hostname }}"
+          - "PROJECTS: {{ compose_projects.stdout }}"
+          - "COMPOSE FILES: {{ compose_files.files | map(attribute='path') | list }}"
+          - "CONTAINERS: {{ containers.stdout_lines }}"
