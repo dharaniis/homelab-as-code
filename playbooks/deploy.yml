@@ -1,0 +1,99 @@
+---
+- name: Unified Homelab Deployment Workflow
+  hosts: docker_hosts
+  serial: 1
+  become: true
+  check_mode: false
+
+  vars:
+    selected_compose_projects:
+      - all
+
+  pre_tasks:
+    - name: Validate that selected_compose_projects is provided as a non-empty list
+      ansible.builtin.assert:
+        that:
+          - selected_compose_projects is defined
+          - selected_compose_projects is sequence
+          - selected_compose_projects is not string
+          - selected_compose_projects is not mapping
+          - selected_compose_projects | length > 0
+        fail_msg: >-
+          'selected_compose_projects' must be a non-empty list. Strings and scalar values are not accepted.
+          Examples:
+            -e '{"selected_compose_projects": ["immich"]}'
+            -e '{"selected_compose_projects": ["all"]}'
+        quiet: true
+      run_once: true
+
+    - name: Validate that selected_compose_projects contains valid project names or 'all'
+      vars:
+        all_known_projects: "{{ groups['docker_hosts'] | map('extract', hostvars, 'docker_compose_projects') | flatten | map(attribute='name') | unique | list }}"
+        valid_keywords: "{{ all_known_projects + ['all'] }}"
+        invalid_projects: "{{ selected_compose_projects | difference(valid_keywords) }}"
+      ansible.builtin.assert:
+        that:
+          - invalid_projects | length == 0
+        fail_msg: >-
+          Invalid project(s) specified in 'selected_compose_projects': {{ invalid_projects }}.
+          Known valid projects across the inventory are: {{ all_known_projects }} (or 'all').
+        quiet: true
+      run_once: true
+
+  tasks:
+    # --------------------------------------------------------------------------
+    # Project Filtering
+    # --------------------------------------------------------------------------
+    - name: Filter projects matching selected_compose_projects for {{ inventory_hostname }}
+      ansible.builtin.set_fact:
+        matched_compose_projects: >-
+          {{
+            docker_compose_projects
+            if ('all' in selected_compose_projects)
+            else (docker_compose_projects | selectattr('name', 'in', selected_compose_projects) | list)
+          }}
+
+    # --------------------------------------------------------------------------
+    # Stage 2: Selective Configuration Synchronization
+    # --------------------------------------------------------------------------
+    - name: Display planned configuration synchronization on {{ inventory_hostname }}
+      ansible.builtin.debug:
+        msg: "Synchronizing configuration for project '{{ item.name }}' on host '{{ inventory_hostname }}'"
+      loop: "{{ matched_compose_projects }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: matched_compose_projects | length > 0
+
+    - name: Synchronize configuration for selected projects on {{ inventory_hostname }}
+      ansible.builtin.include_tasks:
+        file: tasks/sync-config.yml
+      loop: "{{ matched_compose_projects }}"
+      loop_control:
+        loop_var: compose_project
+        label: "{{ compose_project.name }}"
+      when: matched_compose_projects | length > 0
+
+    # --------------------------------------------------------------------------
+    # Stage 3: Docker Compose Deployment
+    # --------------------------------------------------------------------------
+    - name: Display planned project deployments on {{ inventory_hostname }}
+      ansible.builtin.debug:
+        msg: "Deploying Compose project '{{ item.name }}' on host '{{ inventory_hostname }}'"
+      loop: "{{ matched_compose_projects }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: matched_compose_projects | length > 0
+
+    - name: Deploy matching Docker Compose projects on {{ inventory_hostname }}
+      ansible.builtin.include_tasks:
+        file: tasks/manage-compose.yml
+        apply:
+          check_mode: false
+      vars:
+        compose_wait: true
+        compose_wait_timeout: 120
+      loop: "{{ matched_compose_projects }}"
+      loop_control:
+        loop_var: compose_project
+        label: "{{ compose_project.name }}"
+      when: matched_compose_projects | length > 0

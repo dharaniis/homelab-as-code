@@ -4,158 +4,36 @@
   become: true
 
   tasks:
-    - name: Copy Media Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/media/compose/media/docker-compose.yaml"
-        dest: /home/dharaniis/docker/media/docker-compose.yaml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Alacarte Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/media/compose/alacarte/docker-compose.yml"
-        dest: /home/dharaniis/docker/alacarte/docker-compose.yml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Telegram Downloader Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/media/compose/telegram-downloader/docker-compose.prod.yml"
-        dest: /home/dharaniis/docker/telegram-downloader/docker-compose.prod.yml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy TorrentBot Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/media/compose/torrentbot/docker-compose.yml"
-        dest: /home/dharaniis/docker/TorrentBot/docker-compose.yml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Media monitoring Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/shared/compose/monitoring/docker-compose.yaml"
-        dest: /home/dharaniis/docker/monitoring/docker-compose.yaml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Media Alloy configuration
-      ansible.builtin.template:
-        src: "{{ playbook_dir }}/../docker/shared/compose/monitoring/alloy/config.alloy"
-        dest: /home/dharaniis/docker/monitoring/alloy/config.alloy
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
+    - name: Synchronize configuration for Media projects
+      ansible.builtin.include_tasks:
+        file: tasks/sync-config.yml
+      loop: "{{ docker_compose_projects }}"
+      loop_control:
+        loop_var: compose_project
+        label: "{{ compose_project.name }}"
 
 - name: Copy Cloud Docker configuration files
   hosts: cloud
   become: true
 
   tasks:
-    - name: Copy Immich Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/cloud/compose/cloud/docker-compose.yaml"
-        dest: /home/dharaniis/docker/cloud/docker-compose.yaml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Cloud monitoring Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/shared/compose/monitoring/docker-compose.yaml"
-        dest: /home/dharaniis/docker/monitoring/docker-compose.yaml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Cloud Alloy configuration
-      ansible.builtin.template:
-        src: "{{ playbook_dir }}/../docker/shared/compose/monitoring/alloy/config.alloy"
-        dest: /home/dharaniis/docker/monitoring/alloy/config.alloy
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
+    - name: Synchronize configuration for Cloud projects
+      ansible.builtin.include_tasks:
+        file: tasks/sync-config.yml
+      loop: "{{ docker_compose_projects }}"
+      loop_control:
+        loop_var: compose_project
+        label: "{{ compose_project.name }}"
 
 - name: Copy Monitor Docker configuration files
   hosts: monitor
   become: true
 
   tasks:
-    - name: Copy Monitor Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/monitor/compose/monitor/docker-compose.yaml"
-        dest: /home/dharaniis/docker/monitor/docker-compose.yaml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Render Monitor Alloy configuration
-      ansible.builtin.template:
-        src: "{{ playbook_dir }}/../docker/monitor/compose/monitor/alloy/config.alloy"
-        dest: /home/dharaniis/docker/monitor/alloy/config.alloy
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Blackbox Exporter configuration
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/monitor/compose/monitor/blackbox.yml"
-        dest: /home/dharaniis/docker/monitor/blackbox.yml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Loki configuration
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/monitor/compose/monitor/loki/loki-config.yml"
-        dest: /home/dharaniis/docker/monitor/loki/loki-config.yml
-        owner: "10001"
-        group: "10001"
-        mode: "0644"
-        backup: true
-
-    - name: Copy Prometheus configuration
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/monitor/compose/monitor/prometheus/prometheus.yml"
-        dest: /home/dharaniis/docker/monitor/prometheus/prometheus.yml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy SNMP Exporter configuration
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/monitor/compose/monitor/snmp-exporter/snmp.yml"
-        dest: /home/dharaniis/docker/monitor/snmp-exporter/snmp.yml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
-    - name: Copy Portainer Compose file
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../docker/monitor/compose/portainer/docker-compose.yaml"
-        dest: /home/dharaniis/docker/portainer/docker-compose.yaml
-        owner: dharaniis
-        group: dharaniis
-        mode: "0644"
-        backup: true
-
+    - name: Synchronize configuration for Monitor projects
+      ansible.builtin.include_tasks:
+        file: tasks/sync-config.yml
+      loop: "{{ docker_compose_projects }}"
+      loop_control:
+        loop_var: compose_project
+        label: "{{ compose_project.name }}"

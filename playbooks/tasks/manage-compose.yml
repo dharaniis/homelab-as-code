@@ -1,0 +1,33 @@
+---
+- name: Manage Compose project {{ compose_project.project_name }}
+  community.docker.docker_compose_v2:
+    project_src: "{{ compose_project.project_src }}"
+    files: "{{ compose_project.files }}"
+    project_name: "{{ compose_project.project_name }}"
+    state: present
+    pull: never
+    build: never
+    recreate: auto
+    remove_orphans: false
+    remove_volumes: false
+    wait: "{{ compose_wait | default(false) }}"
+    wait_timeout: "{{ compose_wait_timeout | default(120) }}"
+  register: compose_result
+
+- name: Report Compose project check status
+  ansible.builtin.debug:
+    msg:
+      - "Inventory hostname: {{ inventory_hostname }}"
+      - "Compose project name: {{ compose_project.project_name }}"
+      - "Predicted changed status: {{ 'WOULD CHANGE' if compose_result.changed else 'IN SYNC' }}"
+      - "Compose module output: {{ compose_result.msg | default(compose_result.stderr | default('None')) }}"
+  when: ansible_check_mode
+
+- name: Report Compose project deployment status
+  ansible.builtin.debug:
+    msg:
+      - "Inventory hostname: {{ inventory_hostname }}"
+      - "Compose project name: {{ compose_project.project_name }}"
+      - "Deployment status: {{ 'DEPLOYED (CHANGED)' if compose_result.changed else 'ALREADY UP TO DATE (OK)' }}"
+      - "Compose module output: {{ compose_result.msg | default(compose_result.stderr | default('None')) }}"
+  when: not ansible_check_mode

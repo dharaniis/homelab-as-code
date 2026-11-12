@@ -1,3 +1,16 @@
 ---
 alloy_node: monitor-lxc
 alloy_group: monitor
+
+docker_compose_projects:
+  - name: monitor
+    project_src: /home/dharaniis/docker/monitor
+    files:
+      - docker-compose.yaml
+    project_name: monitor
+
+  - name: portainer
+    project_src: /home/dharaniis/docker/portainer
+    files:
+      - docker-compose.yaml
+    project_name: portainer

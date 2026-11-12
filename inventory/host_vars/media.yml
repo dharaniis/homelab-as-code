@@ -1,3 +1,34 @@
 ---
 alloy_node: media-lxc
 alloy_group: media
+
+docker_compose_projects:
+  - name: media
+    project_src: /home/dharaniis/docker/media
+    files:
+      - docker-compose.yaml
+    project_name: media
+
+  - name: alacarte
+    project_src: /home/dharaniis/docker/alacarte
+    files:
+      - docker-compose.yml
+    project_name: alacarte
+
+  - name: telegram-downloader
+    project_src: /home/dharaniis/docker/telegram-downloader
+    files:
+      - docker-compose.prod.yml
+    project_name: telegram-downloader
+
+  - name: torrentbot
+    project_src: /home/dharaniis/docker/TorrentBot
+    files:
+      - docker-compose.yml
+    project_name: torrentbot
+
+  - name: monitoring
+    project_src: /home/dharaniis/docker/monitoring
+    files:
+      - docker-compose.yaml
+    project_name: monitoring

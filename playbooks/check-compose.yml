@@ -1,0 +1,16 @@
+---
+- name: Check Docker Compose projects status
+  hosts: docker_hosts
+  become: true
+  check_mode: true
+
+  tasks:
+    - name: Process each Docker Compose project in check mode
+      ansible.builtin.include_tasks:
+        file: tasks/manage-compose.yml
+        apply:
+          check_mode: true
+      loop: "{{ docker_compose_projects }}"
+      loop_control:
+        loop_var: compose_project
+        label: "{{ compose_project.name }}"

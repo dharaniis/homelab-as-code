@@ -1,3 +1,16 @@
 ---
 alloy_node: cloud-lxc
 alloy_group: cloud
+
+docker_compose_projects:
+  - name: immich
+    project_src: /home/dharaniis/docker/cloud
+    files:
+      - docker-compose.yaml
+    project_name: immich
+
+  - name: monitoring
+    project_src: /home/dharaniis/docker/monitoring
+    files:
+      - docker-compose.yaml
+    project_name: monitoring
