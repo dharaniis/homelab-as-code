@@ -9,8 +9,8 @@ loki.source.docker "containers" {
 
   labels = {
     job   = "docker",
-    node  = "monitor-lxc",
-    group = "monitor",
+    node  = "{{ alloy_node }}",
+    group = "{{ alloy_group }}",
   }
 }
 
@@ -21,8 +21,8 @@ loki.source.journal "system" {
 
   labels = {
     job   = "systemd-journal",
-    node  = "monitor-lxc",
-    group = "monitor",
+    node  = "{{ alloy_node }}",
+    group = "{{ alloy_group }}",
   }
 }
 
