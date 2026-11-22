@@ -1,6 +1,6 @@
 ---
 - name: Check Docker Compose projects status
-  hosts: docker_hosts
+  hosts: docker
   become: true
   check_mode: true
 

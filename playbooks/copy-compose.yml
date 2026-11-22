@@ -1,0 +1,79 @@
+---
+- name: Synchronize Docker Compose Configuration
+  hosts: docker
+  serial: 1
+  become: true
+
+  vars:
+    selected_compose_projects:
+      - all
+    # Project selection shorthand: -e p=... or -e project=... or -e selected_compose_projects=...
+    _raw_project_input: "{{ p | default(project | default(selected_compose_projects)) }}"
+    normalized_compose_projects: >-
+      {{
+        (_raw_project_input if (_raw_project_input is sequence and _raw_project_input is not string)
+         else (_raw_project_input | string).split(','))
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
+
+  pre_tasks:
+    - name: Validate that project selection is non-empty
+      ansible.builtin.assert:
+        that:
+          - normalized_compose_projects | length > 0
+        fail_msg: >-
+          No project specified. Provide one or more project names using shorthand syntax:
+            -e p=immich
+            -e p=immich,portainer
+            -e p=all
+        quiet: true
+      run_once: true
+
+    - name: Validate that selected project(s) are known in the inventory or 'all'
+      vars:
+        all_known_projects: "{{ groups['docker'] | map('extract', hostvars, 'docker_compose_projects') | flatten | map(attribute='name') | unique | list }}"
+        valid_keywords: "{{ all_known_projects + ['all'] }}"
+        invalid_projects: "{{ normalized_compose_projects | difference(valid_keywords) }}"
+      ansible.builtin.assert:
+        that:
+          - invalid_projects | length == 0
+        fail_msg: >-
+          Invalid project(s) specified: {{ invalid_projects }}.
+          Known valid projects across the inventory are: {{ all_known_projects }} (or 'all').
+        quiet: true
+      run_once: true
+
+  tasks:
+    # --------------------------------------------------------------------------
+    # Project Filtering
+    # --------------------------------------------------------------------------
+    - name: Filter projects matching selection
+      ansible.builtin.set_fact:
+        matched_compose_projects: >-
+          {{
+            docker_compose_projects
+            if ('all' in normalized_compose_projects)
+            else (docker_compose_projects | selectattr('name', 'in', normalized_compose_projects) | list)
+          }}
+
+    # --------------------------------------------------------------------------
+    # Configuration Synchronization
+    # --------------------------------------------------------------------------
+    - name: Display planned configuration synchronization
+      ansible.builtin.debug:
+        msg: "Synchronizing configuration for project '{{ item.name }}' on host '{{ inventory_hostname }}'"
+      loop: "{{ matched_compose_projects }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: matched_compose_projects | length > 0
+
+    - name: Synchronize configuration for selected projects
+      ansible.builtin.include_tasks:
+        file: tasks/sync-config.yml
+      loop: "{{ matched_compose_projects }}"
+      loop_control:
+        loop_var: compose_project
+        label: "{{ compose_project.name }}"
+      when: matched_compose_projects | length > 0

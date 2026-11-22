@@ -1,6 +1,6 @@
 ---
 - name: Audit Docker infrastructure
-  hosts: docker_hosts
+  hosts: docker
   become: true
   gather_facts: true
 

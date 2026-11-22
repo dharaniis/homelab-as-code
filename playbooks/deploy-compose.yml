@@ -1,6 +1,6 @@
 ---
 - name: Controlled Docker Compose Deployment
-  hosts: docker_hosts
+  hosts: docker
   serial: 1
   become: true
   check_mode: false
@@ -8,49 +8,55 @@
   vars:
     selected_compose_projects:
       - all
+    # Project selection shorthand: -e p=... or -e project=... or -e selected_compose_projects=...
+    _raw_project_input: "{{ p | default(project | default(selected_compose_projects)) }}"
+    normalized_compose_projects: >-
+      {{
+        (_raw_project_input if (_raw_project_input is sequence and _raw_project_input is not string)
+         else (_raw_project_input | string).split(','))
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
 
   pre_tasks:
-    - name: Validate that selected_compose_projects is provided as a non-empty list
+    - name: Validate that project selection is non-empty
       ansible.builtin.assert:
         that:
-          - selected_compose_projects is defined
-          - selected_compose_projects is sequence
-          - selected_compose_projects is not string
-          - selected_compose_projects is not mapping
-          - selected_compose_projects | length > 0
+          - normalized_compose_projects | length > 0
         fail_msg: >-
-          'selected_compose_projects' must be a non-empty list. Strings and scalar values are not accepted.
-          Examples:
-            -e '{"selected_compose_projects": ["immich"]}'
-            -e '{"selected_compose_projects": ["all"]}'
+          No project specified. Provide one or more project names using shorthand syntax:
+            -e p=immich
+            -e p=immich,portainer
+            -e p=all
         quiet: true
       run_once: true
 
-    - name: Validate that selected_compose_projects contains valid project names or 'all'
+    - name: Validate that selected project(s) are known in the inventory or 'all'
       vars:
-        all_known_projects: "{{ groups['docker_hosts'] | map('extract', hostvars, 'docker_compose_projects') | flatten | map(attribute='name') | unique | list }}"
+        all_known_projects: "{{ groups['docker'] | map('extract', hostvars, 'docker_compose_projects') | flatten | map(attribute='name') | unique | list }}"
         valid_keywords: "{{ all_known_projects + ['all'] }}"
-        invalid_projects: "{{ selected_compose_projects | difference(valid_keywords) }}"
+        invalid_projects: "{{ normalized_compose_projects | difference(valid_keywords) }}"
       ansible.builtin.assert:
         that:
           - invalid_projects | length == 0
         fail_msg: >-
-          Invalid project(s) specified in 'selected_compose_projects': {{ invalid_projects }}.
+          Invalid project(s) specified: {{ invalid_projects }}.
           Known valid projects across the inventory are: {{ all_known_projects }} (or 'all').
         quiet: true
       run_once: true
 
   tasks:
-    - name: Filter projects matching selected_compose_projects for {{ inventory_hostname }}
+    - name: Filter projects matching selection
       ansible.builtin.set_fact:
         matched_compose_projects: >-
           {{
             docker_compose_projects
-            if ('all' in selected_compose_projects)
-            else (docker_compose_projects | selectattr('name', 'in', selected_compose_projects) | list)
+            if ('all' in normalized_compose_projects)
+            else (docker_compose_projects | selectattr('name', 'in', normalized_compose_projects) | list)
           }}
 
-    - name: Display planned project deployments on {{ inventory_hostname }}
+    - name: Display planned project deployments
       ansible.builtin.debug:
         msg: "Deploying project '{{ item.name }}' on host '{{ inventory_hostname }}'"
       loop: "{{ matched_compose_projects }}"
@@ -58,7 +64,7 @@
         label: "{{ item.name }}"
       when: matched_compose_projects | length > 0
 
-    - name: Deploy matching Docker Compose projects on {{ inventory_hostname }}
+    - name: Deploy matching Docker Compose projects
       ansible.builtin.include_tasks:
         file: tasks/manage-compose.yml
         apply:

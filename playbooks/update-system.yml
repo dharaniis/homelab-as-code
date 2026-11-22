@@ -1,0 +1,55 @@
+---
+- name: Update system packages across Linux hosts
+  hosts: "{{ target | default('linux_hosts') }}"
+  serial: 1
+  become: true
+
+  vars:
+    # Proxmox VE officially requires dist-upgrade; LXC defaults to dist as well (can be overridden with -e system_upgrade_type=safe)
+    upgrade_type: "{{ 'dist' if ('proxmox' in group_names) else (system_upgrade_type | default('dist')) }}"
+    autoremove: false
+    reboot: false
+
+  tasks:
+    - name: Update APT package cache
+      ansible.builtin.apt:
+        update_cache: true
+      register: apt_cache_result
+
+    - name: Upgrade installed packages ({{ upgrade_type }} upgrade)
+      ansible.builtin.apt:
+        upgrade: "{{ upgrade_type }}"
+      register: apt_upgrade_result
+
+    - name: Autoremove unneeded packages
+      ansible.builtin.apt:
+        autoremove: true
+      register: apt_autoremove_result
+      when: autoremove | bool
+
+    - name: Check whether reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required_file
+
+    - name: Display package update summary
+      ansible.builtin.debug:
+        msg:
+          - "Hostname: {{ inventory_hostname }} ({{ group_names | join(', ') }})"
+          - "Upgrade mode: {{ upgrade_type }}"
+          - "APT cache updated: {{ apt_cache_result.changed }}"
+          - "Packages upgraded: {{ apt_upgrade_result.changed }}"
+          - "Reboot required: {{ reboot_required_file.stat.exists }}"
+
+    - name: Display detailed APT package upgrade output
+      ansible.builtin.debug:
+        var: apt_upgrade_result.stdout_lines
+      when: apt_upgrade_result.changed and apt_upgrade_result.stdout_lines is defined
+
+    - name: Reboot host if required and enabled
+      ansible.builtin.reboot:
+        msg: "Reboot initiated by Ansible following package updates"
+        reboot_timeout: 300
+      when:
+        - reboot | bool
+        - reboot_required_file.stat.exists
